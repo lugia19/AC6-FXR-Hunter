@@ -4,7 +4,7 @@ The core idea behind this tool is to help you identify the FXR id of an effect t
 
 This is based off of CCCode's excellent [FXR library](https://github.com/EvenTorset/fxr).
 
-You can also watch a video tutorial/explanation [here]().
+You can also watch a video tutorial/explanation [here](https://youtu.be/Hso_eRh0D_c).
 
 ## Prerequisites:
 
