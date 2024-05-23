@@ -108,94 +108,120 @@ if (useRange.toLowerCase().trim() === 'y') {
     }
 }
 
-
-// Colors to use
-let colors = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 0], [1, 1, 1]]; // Red, Green, Blue, Yellow, White
-for (let color of colors){
-    color.push(1)    //Make every color use this alpha.
-}
-
-const colorNames = ['Red', 'Green', 'Blue', 'Yellow', 'White'];
-
-while (effectFiles.length > colors.length) { // Ensure there are enough files to split into four groups
-    await reset_effects();
-
-    const segmentSize = Math.floor(effectFiles.length / colors.length);
-    const segments = [];
-
-    // Create segments and apply color to each
-    for (let i = 0; i < colors.length; i++) {
-        const start = i * segmentSize;
-        const end = (i + 1 === colors.length) ? effectFiles.length : start + segmentSize;
-        segments.push(effectFiles.slice(start, end));
-
-        for (const file of segments[i]) {
-            await setColorForFile(file, effects_dir, colors[i], colorNames[i]); // Apply color
-        }
+console.log("Which mode would you like to use:")
+console.log("1) Color-based ID finder")
+console.log("2) Single ID tester")
+const runningMode = await prompt("Please select one (1/2): ")
+if (runningMode.toLowerCase().trim() === '1') {
+    console.log("Running color-based ID finder...")
+    // Colors to use
+    let colors = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 0], [1, 1, 1]]; // Red, Green, Blue, Yellow, White
+    for (let color of colors){
+        color.push(1)    //Make every color use this alpha.
     }
 
-    // Repack the BND, start the game.
-    await runCommand(witchybnd_path, [root_bnd_dir]);
-    await runCommand(run_ac6_bat);
+    const colorNames = ['Red', 'Green', 'Blue', 'Yellow', 'White'];
 
-    // Construct color prompt with file ID ranges
-    console.log("Please identify the color of the effect by entering the number next to the correct color:");
-    segments.forEach((seg, index) => {
-        console.log(`${index + 1}. ${colorNames[index]} (${seg[0]} to ${seg[seg.length - 1]}) (${seg.length} effect IDs)`);
-    });
-    let selectedIndex = -1
-    while (selectedIndex < 0 || selectedIndex >= segments.length) {
-        const input = await prompt(`Enter your choice (1-${segments.length}) (or r to restart the game if it crashed): `);
-        if (input.toLowerCase().trim() === 'r') {
-            console.log("Recompiling BND and restarting game...");
-            killGame();
-            await runCommand(witchybnd_path, [root_bnd_dir]);
-            await runCommand(run_ac6_bat);
-            continue;
+    while (effectFiles.length > colors.length) { // Ensure there are enough files to split into four groups
+        await reset_effects();
+
+        const segmentSize = Math.floor(effectFiles.length / colors.length);
+        const segments = [];
+
+        // Create segments and apply color to each
+        for (let i = 0; i < colors.length; i++) {
+            const start = i * segmentSize;
+            const end = (i + 1 === colors.length) ? effectFiles.length : start + segmentSize;
+            segments.push(effectFiles.slice(start, end));
+
+            for (const file of segments[i]) {
+                await setColorForFile(file, effects_dir, colors[i], colorNames[i]); // Apply color
+            }
         }
-        selectedIndex = parseInt(input) - 1;
-        if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= segments.length) {
-            selectedIndex = -1;
+
+        // Repack the BND, start the game.
+        await runCommand(witchybnd_path, [root_bnd_dir]);
+        await runCommand(run_ac6_bat);
+
+        // Construct color prompt with file ID ranges
+        console.log("Please identify the color of the effect by entering the number next to the correct color:");
+        segments.forEach((seg, index) => {
+            console.log(`${index + 1}. ${colorNames[index]} (${seg[0]} to ${seg[seg.length - 1]}) (${seg.length} effect IDs)`);
+        });
+        let selectedIndex = -1
+        while (selectedIndex < 0 || selectedIndex >= segments.length) {
+            const input = await prompt(`Enter your choice (1-${segments.length}) (or r to restart the game if it crashed): `);
+            if (input.toLowerCase().trim() === 'r') {
+                console.log("Recompiling BND and restarting game...");
+                killGame();
+                await runCommand(witchybnd_path, [root_bnd_dir]);
+                await runCommand(run_ac6_bat);
+                continue;
+            }
+            selectedIndex = parseInt(input) - 1;
+            if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= segments.length) {
+                selectedIndex = -1;
+            }
         }
+
+        killGame()
+        // Narrow down to the correct segment based on the user's response
+        effectFiles = segments[selectedIndex];
     }
 
-    killGame()
-    // Narrow down to the correct segment based on the user's response
-    effectFiles = segments[selectedIndex];
-}
+    // This block runs after exiting the main loop when effectFiles.length <= colors.length
+    if (effectFiles.length <= colors.length) {
 
-// This block runs after exiting the main loop when effectFiles.length <= colors.length
-if (effectFiles.length <= colors.length) {
-    console.log("Assigning a unique color to each remaining effect file...");
-    await reset_effects();
-    let color_assignment_messages = []
-    // Loop through the remaining effect files and assign each a unique color
+        console.log("Assigning a unique color to each remaining effect file...");
+        await reset_effects();
+        let color_assignment_messages = []
+        // Loop through the remaining effect files and assign each a unique color
+        for (let i = 0; i < effectFiles.length; i++) {
+            const file = effectFiles[i];
+            const color = colors[i % colors.length]; // Ensure we cycle through colors if there are fewer than four files
+            const colorName = colorNames[i % colorNames.length];
+
+            // Apply the color to the file
+            await setColorForFile(file, effects_dir, color, colorName); // Ensure this call is awaited
+
+            // Print the file ID and its assigned color
+            color_assignment_messages.push(`${file}: Set to ${colorName} (${color.join(', ')})`)
+        }
+
+        // Recompile and restart the game
+        console.log("Recompiling BND and restarting game with new settings...");
+        killGame();
+        await runCommand(witchybnd_path, [root_bnd_dir]);
+        await runCommand(run_ac6_bat);
+
+        for (let message of color_assignment_messages)
+            console.log(message)
+
+        await prompt("\nPress enter to exit...\n")
+        killGame();
+    }
+} else {
+    console.log("Running single ID tester...")
     for (let i = 0; i < effectFiles.length; i++) {
-        const file = effectFiles[i];
-        const color = colors[i % colors.length]; // Ensure we cycle through colors if there are fewer than four files
-        const colorName = colorNames[i % colorNames.length];
+        const currentFile = effectFiles[i];
 
-        // Apply the color to the file
-        await setColorForFile(file, effects_dir, color, colorName); // Ensure this call is awaited
+        // Reset all files to 'off' first
+        await reset_effects();
 
-        // Print the file ID and its assigned color
-        color_assignment_messages.push(`${file}: Set to ${colorName} (${color.join(', ')})`)
+        // Set the current file to white
+        await setColorForFile(currentFile, effects_dir, [1, 1, 1, 1], 'White');  // Assume setColorForFile handles setting color and saving the file
+
+        // Repack and restart the game
+        await runCommand(witchybnd_path, [root_bnd_dir]);
+        await runCommand(run_ac6_bat);
+
+        // Wait for user input to continue
+        await prompt(`Currently testing ${currentFile} - Press Enter to continue to the next effect...`);
+
+        // Optionally kill the game if needed before proceeding to the next file
+        killGame();
     }
-
-    // Recompile and restart the game
-    console.log("Recompiling BND and restarting game with new settings...");
-    killGame();
-    await runCommand(witchybnd_path, [root_bnd_dir]);
-    await runCommand(run_ac6_bat);
-
-    for (let message of color_assignment_messages)
-        console.log(message)
-
-    await prompt("\nPress enter to exit...\n")
-    killGame();
 }
-
-
 rl.close();
 
 
