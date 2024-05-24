@@ -15,7 +15,7 @@ The very short tutorial to use this tool is:
 - Unpacked files with UXM
 - ModEngine2 and WitchyBND
 - Node environment with CCCode's library installed
-- Specifying the paths to WitchyBND, the BND you want to search in and the "start ac6" batch file from modengine2 in the js script.
+- Specifying the paths to WitchyBND, the BND you want to search in and modengine2 in the js script.
 
 The tool essentially has two modes - The color-based ID finder, and the single ID tester.
 # What does it do?
