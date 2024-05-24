@@ -242,7 +242,10 @@ if (runningMode.toLowerCase().trim() === '1') {
 } else {
     console.log("Running single ID tester...");
     // Ask for BND name and Origin
-    const bndName = await prompt("Please enter the BND name: ");
+    let bndName = await prompt("Please enter the BND name (defaults to commoneffects): ");
+    if (!bndName || bndName === "") {
+        bndName = "commoneffects"
+    }
     const origin = await prompt("Please enter the Origin (for example, the weapon): ");
 
     const effectsData = {}; // Store the effect details
@@ -266,11 +269,22 @@ if (runningMode.toLowerCase().trim() === '1') {
         console.log("\n".repeat(5))
         console.log(`Currently testing FXR ID ${IDfromFile(currentFile)}`)
         if (isProbablyInvisible)
-            console.log("\x1b[91mEffect is probably invisible!\x1b[0m")
+            console.log("\x1b[91mEffect is probably invisible! Skipping...\x1b[0m")
         if (proxied_fxrIDs.length > 0) {
             console.log(`This FXR also proxies the following IDs (which have also been left enabled): ${proxied_fxrIDs}`)
+            for (let proxied_fxrID of proxied_fxrIDs) {
+                if (proxied_fxrID in effectsData) {
+                    console.log(`${proxied_fxrID} was previously logged as ${effectsData[proxied_fxrID][5]}`)
+                }
+            }
         }
-        let effectDescription = await prompt(`\nEnter description for this effect: `);
+        let effectDescription = ""
+        if (isProbablyInvisible) {
+            effectDescription = "Skipped as it has no nodes/containers, likely not visible."
+        } else {
+            effectDescription = await prompt(`\nEnter description for this effect: `);
+        }
+
         if (proxied_fxrIDs.length > 0) {
             effectDescription += ` - Proxies IDs: ${proxied_fxrIDs}`
         }
