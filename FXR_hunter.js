@@ -25,7 +25,7 @@ const run_ac6_bat = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6 tools\\ModEngine
 
 
 
-
+killGame();
 
 //This is the base color all effects will have. [0, 0, 0] means invisible.
 const off_color = [0, 0, 0, 0]
