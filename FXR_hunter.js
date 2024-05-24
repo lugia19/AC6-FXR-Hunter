@@ -121,6 +121,13 @@ if (runningMode.toLowerCase().trim() === '1') {
     }
 
     const colorNames = ['Red', 'Green', 'Blue', 'Yellow', 'White'];
+    const colorCodes = {
+        'Red': '\x1b[91m',
+        'Green': '\x1b[92m',
+        'Blue': '\x1b[96m',     //Yes, this is actually Cyan. Did it for readability.
+        'Yellow': '\x1b[93m',
+        'White': '\x1b[37m',
+    };
 
     while (effectFiles.length > colors.length) { // Ensure there are enough files to split into four groups
         await reset_effects();
@@ -146,7 +153,8 @@ if (runningMode.toLowerCase().trim() === '1') {
         // Construct color prompt with file ID ranges
         console.log("Please identify the color of the effect by entering the number next to the correct color:");
         segments.forEach((seg, index) => {
-            console.log(`${index + 1}. ${colorNames[index]} (${seg[0]} to ${seg[seg.length - 1]}) (${seg.length} effect IDs)`);
+            const colorCode = colorCodes[colorNames[index]] || '\x1b[0m'; // Default to no color if not found
+            console.log(`${colorCode}` + `${index + 1}. ${colorNames[index]} (${seg[0]} to ${seg[seg.length - 1]}) (${seg.length} effect IDs)` + "\x1b[0m");
         });
         let selectedIndex = -1
         while (selectedIndex < 0 || selectedIndex >= segments.length) {
@@ -180,12 +188,14 @@ if (runningMode.toLowerCase().trim() === '1') {
             const file = effectFiles[i];
             const color = colors[i % colors.length]; // Ensure we cycle through colors if there are fewer than four files
             const colorName = colorNames[i % colorNames.length];
+            const colorCode = colorCodes[colorName] || '\x1b[0m'; // Default to no color if not found
+
 
             // Apply the color to the file
             await setColorForFile(file, effects_dir, color, colorName); // Ensure this call is awaited
 
             // Print the file ID and its assigned color
-            color_assignment_messages.push(`${file}: Set to ${colorName} (${color.join(', ')})`)
+            color_assignment_messages.push(`${colorCode}`+`${file}: Set to ${colorName} (${color.join(', ')})` + "\x1b[0m")
         }
 
         // Recompile and restart the game
