@@ -368,7 +368,7 @@ async function toggleFXRhunter(shouldBeOn) {
     let modlist = configData.extension.mod_loader.mods;
 
     for (let inner_mod of modlist){
-        mod.enabled = false //Just disable all of them to avoid conflicts.
+        inner_mod.enabled = false //Just disable all of them to avoid conflicts.
     }
 
     let mod = modlist.find(mod => mod.name === mod_name)
