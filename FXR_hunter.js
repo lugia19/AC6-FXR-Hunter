@@ -280,11 +280,11 @@ if (runningMode.toLowerCase().trim() === '1') {
         }
         let effectDescription = ""
         if (isProbablyInvisible) {
-            effectDescription = "Skipped as it has no nodes/containers, likely not visible."
+            effectDescription = "Skipped as it has no nodes/containers - likely not visible."
         } else {
-            effectDescription = await prompt(`\nEnter description for this effect (Defaults to "Unknown, not visible."): `);
+            effectDescription = await prompt(`\nEnter description for this effect (Defaults to "Unknown - not visible."): `);
             if (!effectDescription || effectDescription === "") {
-                effectDescription = "Unknown, not visible."
+                effectDescription = "Unknown - not visible."
             }
         }
 
@@ -296,7 +296,7 @@ if (runningMode.toLowerCase().trim() === '1') {
 
         // Store the effect description with its ID
         const id = IDfromFile(currentFile);
-        effectsData[id] = [bndName, "", origin, "", "", effectDescription];
+        effectsData[id] = [bndName.replaceAll(","," - "), "", origin.replaceAll(","," - "), "", "", effectDescription.replaceAll(","," - ")];
     }
     //Create and print the data in CSV format...
 
