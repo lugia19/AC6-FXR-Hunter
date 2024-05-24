@@ -22,7 +22,7 @@ The tool essentially has two modes - The color-based ID finder, and the single I
 
 ## Setup (Shared):
 
-1) Copies the BND of your choosing into the modengine2 mod folder you specify, and unpack it using WitchyBND
+1) Copies the BND of your choosing into the modengine2 mod folder you specify, and unpacks it using WitchyBND
 2) Generates "off" versions of all effects in that BND (this helps avoid confusion, so any effect that isn't currently being evaluated will be disabled)
 3) (Optional) Performs a sanity check, keeping all the effects disabled and asking you if the effect has actually been disabled (just in case it's not in the BND you selected, for example)
 4) (Optional) Allows you to specify a more narrow range to start from (say, one acquired from a previous run of the tool)
