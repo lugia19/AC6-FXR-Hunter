@@ -254,15 +254,26 @@ if (runningMode.toLowerCase().trim() === '1') {
         await reset_effects();
 
         // Set the current file to white
-        await setColorForFile(currentFile, effects_dir, [1, 1, 1, 1], 'White');
-
+        let current_fxr = await setColorForFile(currentFile, effects_dir, [1, 1, 1, 1], 'White');
+        let isProbablyInvisible = current_fxr.root.nodes.length === 0
+        let proxied_fxrIDs = await enableAllProxiedFXRs(current_fxr.id)
+        proxied_fxrIDs = proxied_fxrIDs.filter(id => id !== current_fxr.id);
         // Repack and restart the game
         await runCommand(witchybnd_path, [root_bnd_dir]);
         await runCommand(run_ac6_bat);
 
         // Prompt for effect description
-        const effectDescription = await prompt("\n".repeat(5)+`Currently testing ${IDfromFile(currentFile)} - Enter description for this effect: `);
-
+        console.log("\n".repeat(5))
+        console.log(`Currently testing FXR ID ${IDfromFile(currentFile)}`)
+        if (isProbablyInvisible)
+            console.log("'\x1b[91m'Effect is probably invisible!\x1b[0m")
+        if (proxied_fxrIDs.length > 0) {
+            console.log(`This FXR also proxies the following IDs (which have also been left enabled): ${proxied_fxrIDs}`)
+        }
+        let effectDescription = await prompt(`\nEnter description for this effect: `);
+        if (proxied_fxrIDs.length > 0) {
+            effectDescription += ` - Proxies IDs: ${proxied_fxrIDs}`
+        }
         // Optionally kill the game if needed
         killGame();
 
@@ -300,6 +311,10 @@ function IDfromFile(filename) {
 
 
 function formatFileID(fileID) {
+    if (typeof fileID === 'number') {
+        fileID = fileID.toString();
+    }
+
     // Check if the ID already starts with 'f', otherwise prepend it
     if (!fileID.startsWith('f')) {
         fileID = 'f' + fileID.padStart(9, '0');  // Pad to ensure the ID part has 9 digits after 'f'
@@ -437,6 +452,39 @@ async function reset_effects() {
         console.error(`Error in reset_effects: ${error}`);
     }
 }
+function findProxiedFXRIDs(fxr) {
+    let root = fxr.root
+    let stack = [root];
+    let result = [];
+
+    while (stack.length > 0) {
+        let node = stack.pop();
+        if (node.type === 2001) {
+            result.push(node.sfx);
+        }
+        stack.push(...node.getNodes(Game.ArmoredCore6));
+    }
+
+    return result;
+}
+
+async function enableAllProxiedFXRs(fxrID, collectedIDs = []) {
+    const fileName = formatFileID(fxrID);  // Ensure ID is in the correct format
+    collectedIDs.push(fxrID);  // Add the current FXR ID to the list
+
+    let current_fxr = await setColorForFile(fileName, effects_dir, [1, 1, 1, 1], 'White');
+
+    // Find any proxied FXR IDs from the current FXR
+    let proxied_fxrIDs = findProxiedFXRIDs(current_fxr);
+
+    for (let proxiedID of proxied_fxrIDs) {
+        // Recursively process each proxied FXR and merge their results
+        await enableAllProxiedFXRs(proxiedID, collectedIDs);
+    }
+
+    return collectedIDs;  // Return the complete list of processed FXR IDs.
+    // REMEMBER: THIS INCLUDES THE ORIGINAL FXR ITSELF!
+}
 
 async function setColorForFile(fileName, destinationDirectory, color, colorName) {
     const sourceFilePath = path.join(effects_backup_dir, fileName);
@@ -471,6 +519,7 @@ async function setColorForFile(fileName, destinationDirectory, color, colorName)
     });
     //console.log(`Set ${destinationFilePath} to ${colorName} (${color})`)
     await fxr.saveAs(destinationFilePath, Game.ArmoredCore6);
+    return fxr;
 }
 
 function prompt(query) {
