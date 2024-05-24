@@ -1,5 +1,6 @@
 import { FXR, Game } from '@cccode/fxr';
 import fs from 'fs/promises';
+import fssync from 'fs';
 import path from 'path';
 import readline from 'readline';
 import { execSync } from 'child_process';
@@ -36,6 +37,7 @@ const modengine2_mod_directory = path.join(modengine2_directory, mod_name)
 //Let's clean up after ourselves...
 try {
     await fs.access(modengine2_mod_directory);
+    fssync.rmSync(modengine2_mod_directory, { recursive: true, force: true });
 } catch (error) {}
 
 await fs.mkdir(modengine2_mod_directory, { recursive: true })
@@ -283,6 +285,12 @@ rl.close();
 //await toggleFXRhunter(false) - No need to toggle it off if we're copying back the backup anyway.
 await fs.copyFile(ac6_config_backup, ac6_config_file);
 await fs.rm(ac6_config_backup)
+
+try {
+    await fs.access(modengine2_mod_directory);
+    fssync.rmSync(modengine2_mod_directory, { recursive: true, force: true });
+} catch (error) {}
+
 
 function IDfromFile(filename) {
     const regex = /f0+(\d+)\.fxr$/;
