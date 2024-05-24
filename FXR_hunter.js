@@ -201,7 +201,13 @@ if (runningMode.toLowerCase().trim() === '1') {
         killGame();
     }
 } else {
-    console.log("Running single ID tester...")
+    console.log("Running single ID tester...");
+    // Ask for BND name and Origin
+    const bndName = await prompt("Please enter the BND name: ");
+    const origin = await prompt("Please enter the Origin (for example, the weapon): ");
+
+    const effectsData = {}; // Store the effect details
+
     for (let i = 0; i < effectFiles.length; i++) {
         const currentFile = effectFiles[i];
 
@@ -209,20 +215,38 @@ if (runningMode.toLowerCase().trim() === '1') {
         await reset_effects();
 
         // Set the current file to white
-        await setColorForFile(currentFile, effects_dir, [1, 1, 1, 1], 'White');  // Assume setColorForFile handles setting color and saving the file
+        await setColorForFile(currentFile, effects_dir, [1, 1, 1, 1], 'White');
 
         // Repack and restart the game
         await runCommand(witchybnd_path, [root_bnd_dir]);
         await runCommand(run_ac6_bat);
 
-        // Wait for user input to continue
-        await prompt(`Currently testing ${currentFile} - Press Enter to continue to the next effect...`);
+        // Prompt for effect description
+        const effectDescription = await prompt(`Currently testing ${IDfromFile(currentFile)} - Enter description for this effect: `);
 
-        // Optionally kill the game if needed before proceeding to the next file
+        // Optionally kill the game if needed
         killGame();
+
+        // Store the effect description with its ID
+        const id = IDfromFile(currentFile);
+        effectsData[id] = [bndName, "", origin, "", "", effectDescription];
     }
+    //Create and print the data in CSV format...
+
+    const csvRows = [["ID", "BND", "RESOURCES", "ORIGIN", "COLOR", "PARTICLE BEHAVIOUR", "USEFUL INFO"].join(',')]; // Create the header row
+    for (const id of Object.keys(effectsData)) {
+        const row = [id, ...effectsData[id]];
+        csvRows.push(row.join(','));
+    }
+    console.log(csvRows.join('\n'));
 }
 rl.close();
+
+function IDfromFile(filename) {
+    const regex = /f0+(\d+)\.fxr$/;
+    const match = filename.match(regex);
+    return match ? match[1] : null;
+}
 
 
 function formatFileID(fileID) {
