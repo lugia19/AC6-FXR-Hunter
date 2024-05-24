@@ -3,6 +3,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import readline from 'readline';
 import { execSync } from 'child_process';
+import toml from '@iarna/toml'
+
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -15,7 +17,7 @@ const rl = readline.createInterface({
 const effects_bnd = "D:\\SteamLibrary\\steamapps\\common\\ARMORED CORE VI FIRES OF RUBICON\\Game\\sfx\\sfxbnd_commoneffects.ffxbnd.dcx";
 
 //The directory of an active mod (ideally empty)
-const modengine2_mod_directory = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6 tools\\ModEngine-2.1.0.0-win64\\mod";
+const modengine2_directory = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6 tools\\ModEngine-2.1.0.0-win64";
 
 const witchybnd_path = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6 tools\\WitchyBND\\WitchyBND.exe";
 const run_ac6_bat = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6 tools\\ModEngine-2.1.0.0-win64\\launchmod_armoredcore6.bat";
@@ -25,10 +27,32 @@ const run_ac6_bat = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6 tools\\ModEngine
 
 
 
-killGame();
+
 
 //This is the base color all effects will have. [0, 0, 0] means invisible.
 const off_color = [0, 0, 0, 0]
+const mod_name = "fxrhunter"
+const modengine2_mod_directory = path.join(modengine2_directory, mod_name)
+//Let's clean up after ourselves...
+try {
+    await fs.access(modengine2_mod_directory);
+} catch (error) {}
+
+await fs.mkdir(modengine2_mod_directory, { recursive: true })
+const ac6_config_file = path.join(modengine2_directory, "config_armoredcore6.toml")
+const ac6_config_backup = path.join(modengine2_directory, "config_armoredcore6-backup.toml")
+
+//Let's back up the config file as to preserve comments...
+try {
+    await fs.access(ac6_config_backup);
+    //If it already exists, we don't do anything.
+} catch {
+    // If the backup does not exist, create it
+    await fs.copyFile(ac6_config_file, ac6_config_backup);
+}
+
+killGame();
+await toggleFXRhunter(true)
 
 //Let's copy and extract the BND into the mod folder...
 const sfx_directory = path.join(modengine2_mod_directory, 'sfx');
@@ -91,8 +115,8 @@ if (useRange.toLowerCase().trim() === 'y') {
     effectFiles = effectFiles.filter(file => file >= startID && file <= endID);
 
 } else {
-    const skipSanityCheck = await prompt("Do you want to skip the sanity check? (y/n): ");
-    if (skipSanityCheck.toLowerCase().trim() !== 'y') {
+    const skipSanityCheck = await prompt("Do you want to perform the sanity check? (y/n): ");
+    if (skipSanityCheck.toLowerCase().trim() !== 'n') {
         await runCommand(witchybnd_path, [root_bnd_dir]);
         await runCommand(run_ac6_bat);
 
@@ -128,7 +152,7 @@ if (runningMode.toLowerCase().trim() === '1') {
         'Yellow': '\x1b[93m',
         'White': '\x1b[37m',
     };
-
+    mainColorLoop:
     while (effectFiles.length > colors.length) { // Ensure there are enough files to split into four groups
         await reset_effects();
 
@@ -158,13 +182,17 @@ if (runningMode.toLowerCase().trim() === '1') {
         });
         let selectedIndex = -1
         while (selectedIndex < 0 || selectedIndex >= segments.length) {
-            const input = await prompt(`Enter your choice (1-${segments.length}) (or r to restart the game if it crashed): `);
+            const input = await prompt(`Enter your choice (1-${segments.length}) (or r to restart the game, or e to exit early): `);
             if (input.toLowerCase().trim() === 'r') {
                 console.log("Recompiling BND and restarting game...");
                 killGame();
                 await runCommand(witchybnd_path, [root_bnd_dir]);
                 await runCommand(run_ac6_bat);
                 continue;
+            } else if (input.toLowerCase().trim() === 'e') {
+                killGame();
+                effectFiles = []
+                break mainColorLoop;
             }
             selectedIndex = parseInt(input) - 1;
             if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= segments.length) {
@@ -178,8 +206,7 @@ if (runningMode.toLowerCase().trim() === '1') {
     }
 
     // This block runs after exiting the main loop when effectFiles.length <= colors.length
-    if (effectFiles.length <= colors.length) {
-
+    if (effectFiles.length <= colors.length && effectFiles.length > 0) {
         console.log("Assigning a unique color to each remaining effect file...");
         await reset_effects();
         let color_assignment_messages = []
@@ -232,7 +259,7 @@ if (runningMode.toLowerCase().trim() === '1') {
         await runCommand(run_ac6_bat);
 
         // Prompt for effect description
-        const effectDescription = await prompt(`Currently testing ${IDfromFile(currentFile)} - Enter description for this effect: `);
+        const effectDescription = await prompt("\n".repeat(5)+`Currently testing ${IDfromFile(currentFile)} - Enter description for this effect: `);
 
         // Optionally kill the game if needed
         killGame();
@@ -250,7 +277,12 @@ if (runningMode.toLowerCase().trim() === '1') {
     }
     console.log(csvRows.join('\n'));
 }
+
+//Let's clean up, like reverting the config...
 rl.close();
+//await toggleFXRhunter(false) - No need to toggle it off if we're copying back the backup anyway.
+await fs.copyFile(ac6_config_backup, ac6_config_file);
+await fs.rm(ac6_config_backup)
 
 function IDfromFile(filename) {
     const regex = /f0+(\d+)\.fxr$/;
@@ -276,21 +308,38 @@ function killGame() {
         const output = execSync(`taskkill /IM "${processName}" /F`);
         console.log(`Output: ${output}`);
     } catch (error) {
-        console.error(`Error: ${error}`);
-        if (error.stdout) {
-            console.log(`stdout: ${error.stdout.toString()}`);
+        if (error.message.includes("The process \"armoredcore6.exe\" not found.")){
+            console.log("Game is not currently running, continuing...")
+        } else {
+            console.error(`Error: ${error}`);
+            if (error.stdout) {
+                console.log(`stdout: ${error.stdout.toString()}`);
+            }
+            if (error.stderr) {
+                console.log(`stderr: ${error.stderr.toString()}`);
+            }
         }
-        if (error.stderr) {
-            console.log(`stderr: ${error.stderr.toString()}`);
-        }
+
     }
 }
 
-/**
- * Executes a command synchronously with optional arguments.
- * @param {string} commandPath Path to the command to execute (e.g., .exe or .bat file).
- * @param {string[]} [args=[]] Optional arguments to pass to the command.
- */
+async function toggleFXRhunter(shouldBeOn) {
+    let configData = toml.parse(await fs.readFile(ac6_config_file, 'utf-8'));
+    let modlist = configData.extension.mod_loader.mods;
+
+    let mod = modlist.find(mod => mod.name === mod_name)
+    if (mod) {
+        mod.enabled = shouldBeOn
+    }
+    else
+    {
+        mod = { enabled: shouldBeOn, name: "fxrhunter", path: "fxrhunter" }
+        modlist.push(mod)
+    }
+
+    const newTomlContent = toml.stringify(configData);
+    await fs.writeFile(ac6_config_file, newTomlContent);
+}
 
 function runCommand(commandPath, args = []) {
     try {
