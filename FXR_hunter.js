@@ -282,7 +282,10 @@ if (runningMode.toLowerCase().trim() === '1') {
         if (isProbablyInvisible) {
             effectDescription = "Skipped as it has no nodes/containers, likely not visible."
         } else {
-            effectDescription = await prompt(`\nEnter description for this effect: `);
+            effectDescription = await prompt(`\nEnter description for this effect (Defaults to "Unknown, not visible."): `);
+            if (!effectDescription || effectDescription === "") {
+                effectDescription = "Unknown, not visible."
+            }
         }
 
         if (proxied_fxrIDs.length > 0) {

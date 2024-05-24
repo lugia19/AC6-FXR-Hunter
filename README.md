@@ -6,6 +6,10 @@ This is based off of CCCode's excellent [FXR library](https://github.com/EvenTor
 
 You can also watch a video tutorial/explanation [here](https://youtu.be/Hso_eRh0D_c).
 
+The very short tutorial to use this tool is:
+1) Use the Color-based ID finder to figure out the range of the weapon/attack you're trying to test (some guesswork will be involved)
+2) Once you have the range, use the single ID tester to narrow down what each individual FXR does
+
 ## Prerequisites:
 
 - Unpacked files with UXM
@@ -39,7 +43,7 @@ The tool essentially has two modes - The color-based ID finder, and the single I
 
 ## Single ID tester:
 
-This is meant to be used on smaller ranges, like say, 5 or so.
+This is meant to be used on smaller ranges, like say, a dozen or so.
 
 For example, say you've used the Color-based finder and narrowed down the moonlight to having its effects in the 9919xx range.
 
@@ -48,5 +52,8 @@ We know IDs are almost always grouped, so you can than use this, run it on IDs f
 
 ### Main loop (one FXR at a time):
 1) Disables every FXR
-2) Sets the FXR currently being processed to full white
-3) Opens the game, waits for user input, closes the game, continues the loop.
+2) Asks the user for the source and effects file
+3) Sets the FXR currently being processed to full white (As well as any FXRs it references)
+4) Opens the game
+5) Waits for the user to describe what the effect does
+6) Closes the game, continues the loop.
