@@ -266,7 +266,7 @@ if (runningMode.toLowerCase().trim() === '1') {
         console.log("\n".repeat(5))
         console.log(`Currently testing FXR ID ${IDfromFile(currentFile)}`)
         if (isProbablyInvisible)
-            console.log("'\x1b[91m'Effect is probably invisible!\x1b[0m")
+            console.log("\x1b[91mEffect is probably invisible!\x1b[0m")
         if (proxied_fxrIDs.length > 0) {
             console.log(`This FXR also proxies the following IDs (which have also been left enabled): ${proxied_fxrIDs}`)
         }
