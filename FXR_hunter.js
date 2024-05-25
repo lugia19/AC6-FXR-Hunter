@@ -296,16 +296,19 @@ if (runningMode.toLowerCase().trim() === '1') {
 
         // Store the effect description with its ID
         const id = IDfromFile(currentFile);
-        effectsData[id] = [bndName.replaceAll(","," - "), "", origin.replaceAll(","," - "), "", "", effectDescription.replaceAll(","," - ")];
+        effectsData[id] = [bndName.replaceAll("\t","    "), "", origin.replaceAll("\t","    "), "", "", effectDescription.replaceAll("\t","    ")];
     }
-    //Create and print the data in CSV format...
+    //Create and print the data in TSV format...
 
-    const csvRows = [["ID", "BND", "RESOURCES", "ORIGIN", "COLOR", "PARTICLE BEHAVIOUR", "USEFUL INFO"].join(',')]; // Create the header row
+    const tsvRows = [["ID", "BND", "RESOURCES", "ORIGIN", "COLOR", "PARTICLE BEHAVIOUR", "USEFUL INFO"].join('\t')]; // Create the header row
     for (const id of Object.keys(effectsData)) {
         const row = [id, ...effectsData[id]];
-        csvRows.push(row.join(','));
+        tsvRows.push(row.join('\t'));
     }
-    console.log(csvRows.join('\n'));
+    console.log(tsvRows.join('\n'));
+    let tsv_path = path.join(modengine2_directory, `${effects_bnd}-${origin}.tsv`)
+    await fs.writeFile(tsv_path, tsvRows.join('\n'));
+    console.log(`TSV data written to ${tsv_path}`)
 }
 
 //Let's clean up, like reverting the config...

@@ -12,6 +12,8 @@
   "license": "ISC",
   "dependencies": {
     "@cccode/fxr": "^9.0.0",
-    "@iarna/toml": "^2.2.5"
+    "@iarna/toml": "^2.2.5",
+    "csv-parser": "^3.0.0",
+    "csv-writer": "^1.6.0"
   }
 }
