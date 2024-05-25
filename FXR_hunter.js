@@ -287,20 +287,15 @@ if (runningMode.toLowerCase().trim() === '1') {
                 effectDescription = "Unknown - not visible."
             }
         }
-
-        if (proxied_fxrIDs.length > 0) {
-            effectDescription += ` - Proxies IDs: ${proxied_fxrIDs}`
-        }
-        // Optionally kill the game if needed
         killGame();
 
         // Store the effect description with its ID
         const id = IDfromFile(currentFile);
-        effectsData[id] = [bndName.replaceAll("\t","    "), "", origin.replaceAll("\t","    "), "", "", effectDescription.replaceAll("\t","    ")];
+        effectsData[id] = [bndName.replaceAll("\t","    "), "", origin.replaceAll("\t","    "), "", "", effectDescription.replaceAll("\t","    "), proxied_fxrIDs.join(",")];
     }
     //Create and print the data in TSV format...
 
-    const tsvRows = [["ID", "BND", "RESOURCES", "ORIGIN", "COLOR", "PARTICLE BEHAVIOUR", "USEFUL INFO"].join('\t')]; // Create the header row
+    const tsvRows = [["ID", "BND", "RESOURCES", "ORIGIN", "COLOR", "PARTICLE BEHAVIOUR", "USEFUL INFO", "REFERENCED FXRS"].join('\t')]; // Create the header row
     for (const id of Object.keys(effectsData)) {
         const row = [id, ...effectsData[id]];
         tsvRows.push(row.join('\t'));
