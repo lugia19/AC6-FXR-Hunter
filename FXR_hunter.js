@@ -18,18 +18,14 @@ const rl = readline.createInterface({
 const effects_bnd = "D:\\SteamLibrary\\steamapps\\common\\ARMORED CORE VI FIRES OF RUBICON\\Game\\sfx\\sfxbnd_commoneffects.ffxbnd.dcx";
 
 //The directory of an active mod (ideally empty)
-const modengine2_directory = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6 tools\\ModEngine-2.1.0.0-win64";
-
-const witchybnd_path = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6 tools\\WitchyBND\\WitchyBND.exe";
-const run_ac6_bat = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6 tools\\ModEngine-2.1.0.0-win64\\launchmod_armoredcore6.bat";
+const modengine2_directory = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6_tools\\ModEngine-2.1.0.0-win64";
+const witchybnd_path = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6_tools\\WitchyBND\\WitchyBND.exe";
 
 
 
 
-
-
-
-
+const modengine2_exe = path.join(modengine2_directory, "modengine2_launcher.exe")
+const modengine2_args = ["-t","ac6","-c",".\\config_ac6_fxrhunter.toml"]
 //This is the base color all effects will have. [0, 0, 0] means invisible.
 const off_color = [0, 0, 0, 0]
 const mod_name = "fxrhunter"
@@ -42,19 +38,10 @@ try {
 
 await fs.mkdir(modengine2_mod_directory, { recursive: true })
 const ac6_config_file = path.join(modengine2_directory, "config_armoredcore6.toml")
-const ac6_config_backup = path.join(modengine2_directory, "config_armoredcore6-backup.toml")
-
-//Let's back up the config file as to preserve comments...
-try {
-    await fs.access(ac6_config_backup);
-    //If it already exists, we don't do anything.
-} catch {
-    // If the backup does not exist, create it
-    await fs.copyFile(ac6_config_file, ac6_config_backup);
-}
+const fxrhunter_config_file = path.join(modengine2_directory, "config_ac6_fxrhunter.toml")
 
 killGame();
-await toggleFXRhunter(true)
+await createFXRhunterConfig(true)
 
 //Let's copy and extract the BND into the mod folder...
 const sfx_directory = path.join(modengine2_mod_directory, 'sfx');
@@ -70,7 +57,7 @@ try {
 
 //Let's get the root_bnd_dir, and clean it up if it already exists.
 const root_bnd_dir = path.join(path.dirname(new_bnd_path), path.basename(new_bnd_path).replace(/\./g, '-') + '-wffxbnd');
-
+const root_bnd_dir_quoted = `"${root_bnd_dir}"`
 // Check if root_bnd_dir exists and delete it if it does
 try {
     await fs.rm(root_bnd_dir, { recursive: true, force: true });
@@ -82,7 +69,7 @@ try {
 //Now the effects_dir...
 const effects_dir = path.join(root_bnd_dir, "effect")
 
-await runCommand(witchybnd_path, [new_bnd_path])
+await runCommand(witchybnd_path, [`"${new_bnd_path}"`])
 
 //Let's ensure we're not using DCX_KRAK_MAX...
 const xmlFilePath = path.join(root_bnd_dir, '_witchy-ffxbnd.xml');
@@ -119,8 +106,9 @@ if (useRange.toLowerCase().trim() === 'y') {
 } else {
     const skipSanityCheck = await prompt("Do you want to perform the sanity check? (y/n): ");
     if (skipSanityCheck.toLowerCase().trim() !== 'n') {
-        await runCommand(witchybnd_path, [root_bnd_dir]);
-        await runCommand(run_ac6_bat);
+        await runCommand(witchybnd_path, [root_bnd_dir_quoted]);
+        await runCommand(modengine2_exe, modengine2_args);
+
 
         let response = await prompt('Is the effect still on? (y/n) ');
 
@@ -130,7 +118,7 @@ if (useRange.toLowerCase().trim() === 'y') {
             process.exit(); // Exit the function if the effect is not governed by common effects
         }
         killGame();
-        console.log('The effect is governed by commoneffects - continuing to identification.');
+        console.log('The effect is governed by commoneffects, continuing to identification.');
     }
 }
 
@@ -173,8 +161,8 @@ if (runningMode.toLowerCase().trim() === '1') {
         }
 
         // Repack the BND, start the game.
-        await runCommand(witchybnd_path, [root_bnd_dir]);
-        await runCommand(run_ac6_bat);
+        await runCommand(witchybnd_path, [root_bnd_dir_quoted]);
+        await runCommand(modengine2_exe, modengine2_args);
 
         // Construct color prompt with file ID ranges
         console.log("Please identify the color of the effect by entering the number next to the correct color:");
@@ -188,8 +176,8 @@ if (runningMode.toLowerCase().trim() === '1') {
             if (input.toLowerCase().trim() === 'r') {
                 console.log("Recompiling BND and restarting game...");
                 killGame();
-                await runCommand(witchybnd_path, [root_bnd_dir]);
-                await runCommand(run_ac6_bat);
+                await runCommand(witchybnd_path, [root_bnd_dir_quoted]);
+                await runCommand(modengine2_exe, modengine2_args);
                 continue;
             } else if (input.toLowerCase().trim() === 'e') {
                 killGame();
@@ -230,8 +218,8 @@ if (runningMode.toLowerCase().trim() === '1') {
         // Recompile and restart the game
         console.log("Recompiling BND and restarting game with new settings...");
         killGame();
-        await runCommand(witchybnd_path, [root_bnd_dir]);
-        await runCommand(run_ac6_bat);
+        await runCommand(witchybnd_path, [root_bnd_dir_quoted]);
+        await runCommand(modengine2_exe, modengine2_args);
 
         for (let message of color_assignment_messages)
             console.log(message)
@@ -262,8 +250,8 @@ if (runningMode.toLowerCase().trim() === '1') {
         let proxied_fxrIDs = await enableAllProxiedFXRs(current_fxr.id)
         proxied_fxrIDs = proxied_fxrIDs.filter(id => id !== current_fxr.id);
         // Repack and restart the game
-        await runCommand(witchybnd_path, [root_bnd_dir]);
-        await runCommand(run_ac6_bat);
+        await runCommand(witchybnd_path, [root_bnd_dir_quoted]);
+        await runCommand(modengine2_exe, modengine2_args);
 
         // Prompt for effect description
         console.log("\n".repeat(5))
@@ -280,11 +268,11 @@ if (runningMode.toLowerCase().trim() === '1') {
         }
         let effectDescription = ""
         if (isProbablyInvisible) {
-            effectDescription = "Skipped as it has no nodes/containers - likely not visible."
+            effectDescription = "Skipped as it has no nodes/containers, likely not visible."
         } else {
-            effectDescription = await prompt(`\nEnter description for this effect (Defaults to "Unknown - not visible."): `);
+            effectDescription = await prompt(`\nEnter description for this effect (Defaults to "Unknown, not visible."): `);
             if (!effectDescription || effectDescription === "") {
-                effectDescription = "Unknown - not visible."
+                effectDescription = "Unknown, not visible."
             }
         }
         killGame();
@@ -308,9 +296,6 @@ if (runningMode.toLowerCase().trim() === '1') {
 
 //Let's clean up, like reverting the config...
 rl.close();
-//await toggleFXRhunter(false) - No need to toggle it off if we're copying back the backup anyway.
-await fs.copyFile(ac6_config_backup, ac6_config_file);
-await fs.rm(ac6_config_backup)
 
 try {
     await fs.access(modengine2_mod_directory);
@@ -361,7 +346,7 @@ function killGame() {
     }
 }
 
-async function toggleFXRhunter(shouldBeOn) {
+async function createFXRhunterConfig(){
     let configData = toml.parse(await fs.readFile(ac6_config_file, 'utf-8'));
     let modlist = configData.extension.mod_loader.mods;
 
@@ -371,16 +356,16 @@ async function toggleFXRhunter(shouldBeOn) {
 
     let mod = modlist.find(mod => mod.name === mod_name)
     if (mod) {
-        mod.enabled = shouldBeOn
+        mod.enabled = true
     }
     else
     {
-        mod = { enabled: shouldBeOn, name: "fxrhunter", path: "fxrhunter" }
+        mod = { enabled: true, name: "fxrhunter", path: "fxrhunter" }
         modlist.push(mod)
     }
 
     const newTomlContent = toml.stringify(configData);
-    await fs.writeFile(ac6_config_file, newTomlContent);
+    await fs.writeFile(fxrhunter_config_file, newTomlContent);
 }
 
 function runCommand(commandPath, args = []) {
@@ -390,7 +375,7 @@ function runCommand(commandPath, args = []) {
             stdio: 'inherit'               // Inherits the standard input, output, and error streams
         };
         // Ensure all arguments are correctly quoted
-        const commandLine = `"${commandPath}" ${args.map(arg => `"${arg}"`).join(" ")}`;
+        const commandLine = `"${commandPath}" ${args.join(" ")}`;
         execSync(commandLine, options);
         console.log(`${path.basename(commandPath)} executed successfully.`);
     } catch (error) {
