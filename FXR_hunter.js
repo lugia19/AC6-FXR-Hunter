@@ -396,12 +396,7 @@ async function initialSetup() {
 
             const working_effect_dir = path.join(working_root_bnd_dir, 'effect');
             for (let file of (await fs.readdir(working_effect_dir)).filter(f => f.endsWith('.fxr'))) {
-                try {
                     await fs.move(path.join(working_effect_dir, file), path.join(effects_dir, file), { overwrite: true });
-                } catch (error) {
-                    console.log("error")
-                }
-
             }
 
             const working_resource_dir = path.join(working_root_bnd_dir, 'resource');
