@@ -368,7 +368,7 @@ async function initialSetup() {
         console.error(`Failed to modify XML file: ${error}`);
     }
 
-    console.log("NOTE: This is useful if you don't know which BND your effect is in, but it operates under the assumption that FXRs with the same ID located in different BNDs are actually identical.")
+    console.log("NOTE: This is useful if you don't know which BND your effect is in. It operates under the assumption that FXRs with the same ID located in different BNDs are actually identical, which is true for AC6.")
     console.log("This will basically place all FXRs into the BND you selected.")
     const mergeBNDs = await prompt("Do you want to merge all the BNDs? (y/n): ");
     if (mergeBNDs.toLowerCase().trim() === 'y') {
