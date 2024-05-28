@@ -12,11 +12,9 @@ const rl = readline.createInterface({
 
 
 //These are the parameters you need to change yourself:
-//The target_ffxbnd where you want to try and find the effect
-const target_ffxbnd = "D:\\SteamLibrary\\steamapps\\common\\ARMORED CORE VI FIRES OF RUBICON\\Game\\sfx\\sfxbnd_commoneffects.ffxbnd.dcx";
-
-const modengine2_directory = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6_tools\\ModEngine-2.1.0.0-win64";
-const witchybnd_path = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6_tools\\WitchyBND\\WitchyBND.exe";
+const ac6_sfx_directory = "D:\\SteamLibrary\\steamapps\\common\\ARMORED CORE VI FIRES OF RUBICON\\Game\\sfx"
+const modengine2_directory = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6_tools\\ModEngine-2.1.0.0-win64"
+const witchybnd_path = "C:\\Users\\lugia19\\Desktop\\Programs\\AC6_tools\\WitchyBND\\WitchyBND.exe"
 
 
 //These are the colors used to identify effects in the color hunter mode.
@@ -49,10 +47,7 @@ const colors = [
 ];
 colors.forEach(color => color.rgba.push(1))
 
-let isMerge = false
-
 //region Common helper methods
-
 FXR.prototype.clone = function() {
     return FXR.fromJSON(this.toJSON())
 }
@@ -294,6 +289,7 @@ const modengine2_mod_directory = path.join(modengine2_directory, "fxrhunter")
 
 
 //So many paths...
+const target_ffxbnd = path.join(ac6_sfx_directory, "sfxbnd_commoneffects.ffxbnd.dcx")
 const sfx_directory = path.join(modengine2_mod_directory, 'sfx');
 const new_bnd_path = path.join(sfx_directory, path.basename(target_ffxbnd));
 
@@ -368,55 +364,48 @@ async function initialSetup() {
         console.error(`Failed to modify XML file: ${error}`);
     }
 
-    console.log("NOTE: This is useful if you don't know which BND your effect is in. It operates under the assumption that FXRs with the same ID located in different BNDs are actually identical, which is true for AC6.")
-    console.log("This will basically place all FXRs into the BND you selected.")
-    const mergeBNDs = await prompt("Do you want to merge all the BNDs? (y/n): ");
-    if (mergeBNDs.toLowerCase().trim() === 'y') {
-        isMerge = true
-        const original_sfx_directory = path.dirname(target_ffxbnd)
-        //TL;DR of what I need to do here.
+    console.log("Merging all BNDs into commoneffects...")
+    const original_sfx_directory = path.dirname(target_ffxbnd)
+    //TL;DR of what I do here.
 
-        //Loop over every .ffxbnd.dcx file in original_sfx_directory and:
-        // 1) copy it to new_bnd_path = path.join(sfx_directory, path.basename(filename));
-        // 2) unpack it with await runCommand(witchybnd_path, [`"${new_bnd_path}"`])
-        // 2.5) Get the newly created folder path by doing root_bnd_dir = path.join(path.dirname(new_bnd_path), path.basename(new_bnd_path).replace(/\./g, '-') + '-wffxbnd');
-        // 3) MOVE the .fxr files from the newly unpacked folder's `effect` subdirectory into a specified folder.
-        // 4) MOVE the .ffxreslist files in the `resource` subdirectory, into a different specified folder.
-        // 5) Repack the bnd file by doing await runCommand(witchybnd_path, [`"${root_bnd_dir}"`]);
+    //Loop over every .ffxbnd.dcx file in original_sfx_directory and:
+    // 1) copy it to sfx_directory
+    // 2) unpack it
+    // 2.5) Get the newly created folder path
+    // 3) Move all the files from every subdirectory into commoneffects
+    // 4) Repack the bnd file by doing await runCommand(witchybnd_path, [`"${root_bnd_dir}"`]);
 
-        let ffxbnd_files = (await fs.readdir(original_sfx_directory)).filter(f => f.endsWith('.ffxbnd.dcx'));
-        ffxbnd_files = ffxbnd_files.filter(item => item !== path.basename(target_ffxbnd))
+    let ffxbnd_files = (await fs.readdir(original_sfx_directory)).filter(f => f.endsWith('.ffxbnd.dcx'));
+    ffxbnd_files = ffxbnd_files.filter(item => item !== path.basename(target_ffxbnd))
 
-        for (let filename of ffxbnd_files) {
-            const destination_for_working_bnd = path.join(sfx_directory, path.basename(filename));
-            await fs.copy(path.join(original_sfx_directory, filename), destination_for_working_bnd);
-            await runCommand(witchybnd_path, [`"${destination_for_working_bnd}"`]); //Unpack
-            const working_root_bnd_dir = path.join(path.dirname(destination_for_working_bnd), path.basename(destination_for_working_bnd).replace(/\./g, '-') + '-wffxbnd');
+    for (let filename of ffxbnd_files) {
+        const destination_for_working_bnd = path.join(sfx_directory, path.basename(filename));
+        await fs.copy(path.join(original_sfx_directory, filename), destination_for_working_bnd);
+        await runCommand(witchybnd_path, [`"${destination_for_working_bnd}"`]); //Unpack
+        const working_root_bnd_dir = path.join(path.dirname(destination_for_working_bnd), path.basename(destination_for_working_bnd).replace(/\./g, '-') + '-wffxbnd');
 
+        //We have it unpacked, so merge all the dirs.
+        let subdirs = (await fs.readdir(working_root_bnd_dir, { withFileTypes: true }))
+        subdirs = subdirs.filter(dirent => dirent.isDirectory())
 
-            const working_effect_dir = path.join(working_root_bnd_dir, 'effect');
-            for (let file of (await fs.readdir(working_effect_dir)).filter(f => f.endsWith('.fxr'))) {
-                    await fs.move(path.join(working_effect_dir, file), path.join(effects_dir, file), { overwrite: true });
+        for (let dir of subdirs) {
+            const working_subdirectory = path.join(working_root_bnd_dir, dir.name);
+            const destination_subdirectory = path.join(root_bnd_dir, dir.name)
+
+            for (let file of (await fs.readdir(working_subdirectory))) {
+                await fs.move(path.join(working_subdirectory, file), path.join(destination_subdirectory, file), { overwrite: true });
             }
-
-            const working_resource_dir = path.join(working_root_bnd_dir, 'resource');
-            for (let file of (await fs.readdir(working_resource_dir)).filter(f => f.endsWith('.ffxreslist'))) {
-                await fs.move(path.join(working_resource_dir, file), path.join(path.join(root_bnd_dir, "resource"), file), { overwrite: true });
-            }
-
-            // Repack the bnd file
-            await runCommand(witchybnd_path, [`"${working_root_bnd_dir}"`]);
-
-            // Optionally delete the unpacked folder if no longer needed
-            // await fs.remove(root_bnd_dir);
-
         }
-        console.log("\n".repeat(10))
-        console.log("Merged all BNDs!")
+
+        // Repack the bnd file
+        await runCommand(witchybnd_path, [`"${working_root_bnd_dir}"`]);
+
+        // Optionally delete the unpacked folder if no longer needed
+        // await fs.remove(root_bnd_dir);
+
     }
-
-
-
+    console.log("Merged all BNDs!")
+    console.log("\n".repeat(10))
 
     //Lets create disabled_fxrs and original_fxrs
     const all_fxr_files = fs.readdirSync(effects_dir).filter(file => file.endsWith('.fxr'));
@@ -459,13 +448,12 @@ async function get_initial_file_range(){
             let response = await prompt('Is the effect still on? (y/n) ');
 
             if (response.toLowerCase().trim() === 'y') {
-                if (!isMerge) console.log(`The effect is not governed by ${path.basename(new_bnd_path)}.`);
-                else console.log(`Effect wasn't disabled even after merging all BNDs into ${path.basename(new_bnd_path)}. No idea!`)
+                console.log(`The effect is... probably not an effect, since we've disabled every effect in the game. Or something else weird is going on.`)
                 rl.close();
-                process.exit(); // Exit the function if the effect is not governed by common effects
+                process.exit();
             }
 
-            console.log(`The effect is governed by ${path.basename(new_bnd_path)}, continuing to identification.`);
+            console.log(`Continuing to identification.`);
         }
     }
     return effectFiles
