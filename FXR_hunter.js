@@ -207,6 +207,17 @@ function killGame() {
 
 
 //region Helper methods specific to this script.
+
+function forceNodeColor(node, targetColor) {
+    node.recolor((currentColor) => {
+        if (typeof targetColor === 'string') {
+            targetColor = hexToRgba(targetColor);
+        }
+        return targetColor;
+    });
+}
+
+
 /**
  * Kills the game if it's running, repacks the given bnd, and restarts the game.
  * @returns {Promise<void>}
@@ -266,7 +277,7 @@ async function recolorAndSaveFXR(fxr, destinationDirectory, color, colorName) {
         console.error(error)
     }
     const destinationFilePath = path.join(destinationDirectory, getFilenameFromFXRID(fxr.id));
-    recolorNode(fxr_clone.root, color)
+    forceNodeColor(fxr_clone.root, color)
     //console.log(`Set ${destinationFilePath} to ${colorName} (${color})`)
     await fxr_clone.saveAs(destinationFilePath, Game.ArmoredCore6);
 }
@@ -419,7 +430,7 @@ async function initialSetup() {
         const fxr = await FXR.read(filePath, Game.ArmoredCore6);
         original_fxrs.set(fxr.id, fxr)
         const disabled_fxr = fxr.clone()
-        recolorNode(disabled_fxr.root, off_color)
+        forceNodeColor(disabled_fxr.root, off_color)
         disabled_fxrs.set(disabled_fxr.id, disabled_fxr)
     }
 }
@@ -532,7 +543,7 @@ async function promptForColorChoice(segments) {
 }
 
 async function colorIDFinder(effectFiles) {
-    console.log("Running color-based ID finder...");
+    console.log("Starting color-based ID finder...");
 
     while (effectFiles.length > colors.length) {
         await reset_all_effects_to_off();
@@ -584,7 +595,7 @@ function createTSVRows(effectsData) {
 }
 
 async function singleIDTester(effectFiles) {
-    console.log("Running single ID tester...");
+    console.log("Starting single ID tester...");
     let bndName = await prompt("Please enter the BND name (defaults to commoneffects): ");
     if (!bndName || bndName === "") bndName = "commoneffects";
 
