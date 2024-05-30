@@ -213,13 +213,17 @@ function forceNodeColor(node, targetColor) {
 }
 
 
+async function runWitchy(bnd_dir_or_file) {
+    await runCommand(witchybnd_path, ["-p",`"${bnd_dir_or_file}"`]);
+}
+
 /**
  * Kills the game if it's running, repacks the given bnd, and restarts the game.
  * @returns {Promise<void>}
  */
 async function restartGameAndRepack() {
     killGame()
-    await runCommand(witchybnd_path, [`"${root_bnd_dir}"`]);
+    await runWitchy(root_bnd_dir);
     await runCommand(modengine2_exe, modengine2_args);
 }
 
@@ -295,7 +299,6 @@ const new_bnd_path = path.join(sfx_directory, path.basename(target_ffxbnd));
 
 //Let's get the root_bnd_dir.
 const root_bnd_dir = path.join(path.dirname(new_bnd_path), path.basename(new_bnd_path).replace(/\./g, '-') + '-wffxbnd');
-const root_bnd_dir_quoted = `"${root_bnd_dir}"`
 
 //Now the effects_dir...
 const effects_dir = path.join(root_bnd_dir, "effect")
@@ -352,7 +355,7 @@ async function initialSetup() {
 
 
     //Let's unpack the BND.
-    await runCommand(witchybnd_path, [`"${new_bnd_path}"`])
+    await runWitchy(new_bnd_path)
 
     //Let's ensure we're not using DCX_KRAK_MAX...
     const xmlFilePath = path.join(root_bnd_dir, '_witchy-ffxbnd.xml');
@@ -373,7 +376,7 @@ async function initialSetup() {
     // 2) unpack it
     // 2.5) Get the newly created folder path
     // 3) Move all the files from every subdirectory into commoneffects
-    // 4) Repack the bnd file by doing await runCommand(witchybnd_path, [`"${root_bnd_dir}"`]);
+    // 4) Repack the bnd file by doing await runWitchy(root_bnd_dir);
 
     let ffxbnd_files = (await fs.readdir(original_sfx_directory)).filter(f => f.endsWith('.ffxbnd.dcx'));
     ffxbnd_files = ffxbnd_files.filter(item => item !== path.basename(target_ffxbnd))
@@ -381,7 +384,7 @@ async function initialSetup() {
     for (let filename of ffxbnd_files) {
         const destination_for_working_bnd = path.join(sfx_directory, path.basename(filename));
         await fs.copy(path.join(original_sfx_directory, filename), destination_for_working_bnd);
-        await runCommand(witchybnd_path, [`"${destination_for_working_bnd}"`]); //Unpack
+        await runWitchy(destination_for_working_bnd) //Unpack
         const working_root_bnd_dir = path.join(path.dirname(destination_for_working_bnd), path.basename(destination_for_working_bnd).replace(/\./g, '-') + '-wffxbnd');
 
         //We have it unpacked, so merge all the dirs.
@@ -398,12 +401,14 @@ async function initialSetup() {
         }
 
         // Repack the bnd file
-        await runCommand(witchybnd_path, [`"${working_root_bnd_dir}"`]);
+        await runWitchy(working_root_bnd_dir);
 
         // Optionally delete the unpacked folder if no longer needed
         // await fs.remove(root_bnd_dir);
 
     }
+
+    await runWitchy(root_bnd_dir);
     console.log("Merged all BNDs!")
     console.log("\n".repeat(10))
 
@@ -604,7 +609,7 @@ async function singleIDTester(effectFiles) {
             proxied_fxrIDs = proxied_fxrIDs.filter(id => id !== current_fxr.id);
 
             killGame();
-            await runCommand(witchybnd_path, [root_bnd_dir_quoted]);
+            await runWitchy(root_bnd_dir)
             await runCommand(modengine2_exe, modengine2_args);
 
             if (proxied_fxrIDs.length > 0) {
