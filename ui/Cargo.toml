@@ -1,0 +1,11 @@
+[package]
+name = "fxr_hunter_ui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eframe = { version = "0.31", default-features = false, features = ["default_fonts", "glow"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 2

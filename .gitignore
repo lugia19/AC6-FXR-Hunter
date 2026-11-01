@@ -1,0 +1,6 @@
+build/
+package/
+fxr/node_modules/
+dll/target/
+__pycache__/
+ui/target/

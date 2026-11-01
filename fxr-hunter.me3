@@ -1,0 +1,17 @@
+profileVersion = "v1"
+
+# fxr-hunter: every FXR gets a hunter external value; the DLL freezes the game and color-codes live effects.
+# Paths are relative to this file (the package folder build.py writes).
+
+# Modded play uses its own save: me3 copies the real save to this file on first launch and never touches the original.
+savefile = "FxrHunter.sl2"
+
+[[supports]]
+game = "armoredcore6"
+
+[[packages]]
+id = "fxr-hunter"
+path = 'mod'
+
+[[natives]]
+path = 'fxr_hunter.dll'

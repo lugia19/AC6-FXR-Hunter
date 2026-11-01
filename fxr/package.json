@@ -1,0 +1,8 @@
+{
+  "name": "fxr-hunter-inject",
+  "type": "module",
+  "private": "true",
+  "dependencies": {
+    "@cccode/fxr": "^32.1.3"
+  }
+}
