@@ -9,9 +9,7 @@
 //! Recording, looks and watches: session.rs. The UI (ui/: fxr_hunter_ui.exe, started by launch_ui and closed with
 //! the game) talks to it through a local socket (server.rs).
 //!
-//! Keys (game window focused): F9 record, F10 stop recording, F11 slow on/off, Up/Down select a listed FXR (marked in
-//! the UI), Insert cycle its color, Delete hide/show it, Home solo it, Page Up slow when it appears, Page Down reset
-//! all looks.
+//! Keys (game window focused): F9 record, F10 stop recording, F11 slow on/off. Everything else is in the UI.
 //! Log: Game\debug-logs\fxr_hunter.log
 
 mod freeze;
@@ -112,7 +110,8 @@ unsafe extern "system" fn get_impl(block: *mut u8, out: *mut u32, id: i32) -> *m
 
 fn install_get_hook() -> Result<(), String> {
     let prologue = unsafe { std::slice::from_raw_parts(GET_ADDR as *const u8, 5) };
-    if prologue != GET_PROLOGUE {
+    // A jmp means another DLL (e.g. a mod serving its own external values) hooked it first; the detours chain fine.
+    if prologue != GET_PROLOGUE && prologue[0] != 0xe9 {
         return Err(format!("unexpected bytes at {GET_ADDR:#x} (not 1.09.1?)"));
     }
     let detour = unsafe { RawDetour::new(GET_ADDR as *const (), get_impl as *const ()) }.map_err(|e| e.to_string())?;
@@ -184,7 +183,7 @@ fn init() {
     std::thread::spawn(input::input_loop);
     std::thread::spawn(server::serve);
     std::thread::spawn(launch_ui);
-    log("ready: F9 record, F10 stop, F11 freeze, Up/Down select, Ins color, Del hide, Home solo, PgUp watch, PgDn reset");
+    log("ready: F9 record, F10 stop, F11 slow");
 }
 
 /// Starts the UI (fxr_hunter_ui.exe next to this DLL), tied to the game: it closes when the game exits.

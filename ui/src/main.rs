@@ -2,11 +2,11 @@
 //!
 //! The fxr_hunter DLL starts this next to the game (and the game's exit closes it). It talks to the DLL over
 //! 127.0.0.1:48690 (dll/src/server.rs): one command per line, one JSON state line back. In-game keys: F9 record,
-//! F10 stop, F11 slow on/off, Up/Down select, Insert cycle color, Delete hide, Home solo, Page Up slow when the
-//! selected one appears, Page Down reset looks.
+//! F10 stop, F11 slow on/off; everything else is here, with the mouse.
 
 #![windows_subsystem = "windows"]
 
+use std::collections::BTreeSet;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::sync::mpsc::{Receiver, Sender, channel};
@@ -69,20 +69,36 @@ struct Shared {
 
 /// Talks to the DLL off the UI thread, so a slow reply never stalls drawing: sends queued commands, polls the state
 /// every POLL otherwise, and keeps the last good state when a reply fails.
+///
+/// Redraws only when something visible changed (or after a command): every redraw of a window on top of the game
+/// makes Windows composite the game's frames, which shows as stutter in the game.
 fn connection_thread(commands: Receiver<String>, shared: Arc<Mutex<Shared>>, ctx: egui::Context) {
     let mut conn = Connection { stream: None };
+    let mut online = false;
     loop {
-        let command = match commands.recv_timeout(POLL) {
-            Ok(c) => c,
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => "state".to_string(),
+        let (command, from_user) = match commands.recv_timeout(POLL) {
+            Ok(c) => (c, true),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => ("state".to_string(), false),
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
         };
-        if let Some(state) = conn.send(&command) {
-            let mut s = shared.lock().unwrap();
+        let mut changed = from_user;
+        let mut s = shared.lock().unwrap();
+        if let Some(mut state) = conn.send(&command) {
+            // Changes on nearly every poll during play; not shown (the rows' dots say it per FXR).
+            if let Some(o) = state.as_object_mut() {
+                o.remove("reading_count");
+            }
+            changed |= s.state.as_ref() != Some(&state);
             s.state = Some(state);
             s.last_ok = Some(Instant::now());
         }
-        ctx.request_repaint();
+        let now_online = s.last_ok.is_some_and(|t| t.elapsed() < OFFLINE_AFTER);
+        changed |= now_online != online;
+        online = now_online;
+        drop(s);
+        if changed {
+            ctx.request_repaint();
+        }
     }
 }
 
@@ -98,6 +114,9 @@ struct App {
     range_min: i64,
     range_max: i64,
     range_synced: bool,
+    /// Rows ticked for bulk actions, and the last clicked one (Shift+click range start).
+    selection: BTreeSet<i64>,
+    anchor: Option<i64>,
 }
 
 fn ids(v: &Value) -> Vec<i64> {
@@ -117,15 +136,97 @@ impl App {
                 None => label,
             });
         }
-        parts.push(format!("{} reading now", state["reading_count"]));
         parts.push(format!("{} injected", state["total_ids"]));
         parts.join(" | ")
     }
 
-    fn list(ui: &mut egui::Ui, state: &Value, cmds: &mut Vec<String>) {
+    /// Selects/deselects a row; with Shift, everything between it and the last clicked row too.
+    fn click_select(&mut self, ui: &egui::Ui, order: &[i64], id: i64, select: bool) {
+        let shift = ui.input(|i| i.modifiers.shift);
+        let range = self
+            .anchor
+            .filter(|_| shift)
+            .and_then(|a| Some((order.iter().position(|&x| x == a)?, order.iter().position(|&x| x == id)?)));
+        match range {
+            Some((x, y)) => {
+                for &r in &order[x.min(y)..=x.max(y)] {
+                    if select {
+                        self.selection.insert(r);
+                    } else {
+                        self.selection.remove(&r);
+                    }
+                }
+            }
+            None if select => {
+                self.selection.insert(id);
+            }
+            None => {
+                self.selection.remove(&id);
+            }
+        }
+        self.anchor = Some(id);
+    }
+
+    /// Bulk actions on the selected rows.
+    fn bulk_bar(&mut self, ui: &mut egui::Ui, cmds: &mut Vec<String>) {
+        let sel: Vec<i64> = self.selection.iter().copied().collect();
+        ui.horizontal(|ui| {
+            if sel.is_empty() {
+                ui.label(RichText::new("Tick rows (Shift: a range, Ctrl+A: all) to change several at once.").weak());
+                return;
+            }
+            ui.label(RichText::new(format!("{} selected:", sel.len())).strong());
+            egui::ComboBox::from_id_salt("bulk color").width(80.0).selected_text("color…").show_ui(ui, |ui| {
+                for (name, code, _) in COLORS {
+                    if ui.selectable_label(false, name).clicked() {
+                        cmds.extend(sel.iter().map(|id| format!("look {id} {code}")));
+                    }
+                }
+            });
+            if ui.button("Hide").clicked() {
+                cmds.extend(sel.iter().map(|id| format!("hide {id} 1")));
+            }
+            if ui.button("Show").clicked() {
+                cmds.extend(sel.iter().map(|id| format!("hide {id} 0")));
+            }
+            if ui.button("Solo").on_hover_text("Hide every other listed FXR").clicked() {
+                cmds.push(format!("solo {}", sel.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(" ")));
+            }
+            if ui.button("Copy IDs").on_hover_text("One per line").clicked() {
+                ui.ctx().copy_text(sel.iter().map(|id| id.to_string()).collect::<Vec<_>>().join("\n"));
+            }
+            if ui.button("Ignore").on_hover_text("Add them to the ignore list (Settings)").clicked() {
+                cmds.extend(sel.iter().map(|id| format!("ignore {id}")));
+                self.selection.clear();
+            }
+            if ui.button("×").on_hover_text("Remove them from the list").clicked() {
+                cmds.extend(sel.iter().map(|id| format!("remove {id}")));
+                self.selection.clear();
+            }
+            if ui.button("Clear selection").clicked() {
+                self.selection.clear();
+            }
+        });
+    }
+
+    fn list(&mut self, ui: &mut egui::Ui, state: &Value, cmds: &mut Vec<String>) {
         let rows = state["list"].as_array().cloned().unwrap_or_default();
+        let order: Vec<i64> = rows.iter().filter_map(|r| r["id"].as_i64()).collect();
+        // Rows that left the list (new recording, filters, x) leave the selection.
+        self.selection.retain(|id| order.contains(id));
+        if ui.input(|i| i.modifiers.command && i.key_pressed(egui::Key::A)) && !ui.ctx().wants_keyboard_input() {
+            self.selection.extend(order.iter().copied());
+        }
         egui::Grid::new("fxrs").striped(true).spacing([8.0, 4.0]).show(ui, |ui| {
-            for h in ["", "FXR", "first", "", "color", "", "", "", "", "", "", ""] {
+            let mut all = !order.is_empty() && order.iter().all(|id| self.selection.contains(id));
+            if ui.checkbox(&mut all, "").on_hover_text("Select all / none").changed() {
+                if all {
+                    self.selection.extend(order.iter().copied());
+                } else {
+                    self.selection.clear();
+                }
+            }
+            for h in ["FXR", "first", "", "color", "", "", "", "", "", "", ""] {
                 ui.label(RichText::new(h).weak());
             }
             ui.end_row();
@@ -134,11 +235,16 @@ impl App {
                 let hidden = row["hidden"].as_bool() == Some(true);
                 let look = row["look"].as_u64().unwrap_or(0);
 
-                ui.label(RichText::new(if row["selected"].as_bool() == Some(true) { "▶" } else { "" }).color(Color32::from_rgb(0xd0, 0x20, 0xd0)));
+                let mut selected = self.selection.contains(&id);
+                if ui.checkbox(&mut selected, "").changed() {
+                    self.click_select(ui, &order, id, selected);
+                }
                 let text = RichText::new(id.to_string()).monospace().size(14.0);
                 let text = if hidden { text.weak() } else { text.strong() };
-                if ui.add(egui::Label::new(text).sense(Sense::click())).on_hover_text("Select").clicked() {
-                    cmds.push(format!("select {id}"));
+                let text = if self.selection.contains(&id) { text.background_color(ui.visuals().selection.bg_fill) } else { text };
+                if ui.add(egui::Label::new(text).sense(Sense::click())).on_hover_text("Click to select (Shift: range)").clicked() {
+                    let select = !self.selection.contains(&id);
+                    self.click_select(ui, &order, id, select);
                 }
                 ui.label(match row["first_ms"].as_u64() {
                     Some(ms) => format!("+{:.1}s", ms as f64 / 1000.0),
@@ -197,7 +303,6 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.request_repaint_after(POLL);
         let mut cmds: Vec<String> = Vec::new();
 
         let (state, online) = {
@@ -232,7 +337,7 @@ impl eframe::App for App {
                     ("Stop (F10)", "stop"),
                     ("Toggle slow (F11)", "freeze"),
                     ("Unhide all", "unhide"),
-                    ("Reset looks (PgDn)", "reset"),
+                    ("Reset looks", "reset"),
                 ] {
                     if ui.button(text).clicked() {
                         cmds.push(cmd.into());
@@ -368,7 +473,9 @@ impl eframe::App for App {
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| Self::list(ui, &state, &mut cmds));
+            self.bulk_bar(ui, &mut cmds);
+            ui.separator();
+            egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| self.list(ui, &state, &mut cmds));
         });
 
         for cmd in cmds {
@@ -379,6 +486,8 @@ impl eframe::App for App {
 
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
+        // wgpu (D3D12/Vulkan), not glow: the OpenGL backend flickered next to the game.
+        renderer: eframe::Renderer::Wgpu,
         viewport: egui::ViewportBuilder::default()
             .with_title("FXR Hunter")
             .with_inner_size([720.0, 640.0])
@@ -406,6 +515,8 @@ fn main() -> eframe::Result {
                 range_min: 0,
                 range_max: 999_999_999,
                 range_synced: false,
+                selection: BTreeSet::new(),
+                anchor: None,
             }))
         }),
     )

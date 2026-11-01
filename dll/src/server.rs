@@ -2,8 +2,8 @@
 //!
 //! Commands: state | record | stop | freeze (toggle) | scale <f32>
 //!           | freezescale <f32> (game speed while frozen, F11 and freeze on appear; 0.0001 = stopped)
-//!           | select <fxr id> (toggle) | next | prev | look <fxr id> <0-7>
-//!           | watch <fxr id> (toggle) | hide <fxr id> [0|1] (no value: toggle) | solo [fxr id] (no id: selected)
+//!           | look <fxr id> <0-7> | watch <fxr id> (toggle) | hide <fxr id> [0|1] (no value: toggle)
+//!           | solo <fxr id...> (hide every other listed FXR)
 //!           | unhide | reset | add <fxr id> | remove <fxr id> (from the list; recorded: until the next recording)
 //!           | log start <interval ms> | log stop (seen log, seenlog.rs)
 //!           | ignore <fxr id> (append to the ignore list) | ignore reload
@@ -32,8 +32,6 @@ fn run(line: &str) -> Result<(), String> {
         "freeze" => session::toggle_freeze(),
         "freezescale" => session::set_freeze_scale(parts.next().and_then(|p| p.parse().ok()).ok_or("usage: freezescale <f32>")?),
         "scale" => freeze::set_scale(parts.next().and_then(|p| p.parse().ok()).ok_or("usage: scale <f32>")?),
-        "next" => session::step(1),
-        "prev" => session::step(-1),
         "unhide" => session::unhide_all(),
         "reset" => session::reset_looks(),
         "ignore" => match parts.next() {
@@ -71,17 +69,13 @@ fn run(line: &str) -> Result<(), String> {
             let fxr = id()?;
             session::remove(fxr).then_some(()).ok_or_else(|| not_injected(fxr))?
         }
-        "select" => {
-            let fxr = id()?;
-            session::select(fxr).then_some(()).ok_or_else(|| not_injected(fxr))?
-        }
-        "solo" => match parts.next() {
-            None => session::solo_selected(),
-            Some(p) => {
-                let fxr: i32 = p.parse().map_err(|_| "usage: solo [fxr id]".to_string())?;
-                session::solo(fxr).then_some(()).ok_or_else(|| not_injected(fxr))?
+        "solo" => {
+            let ids: Vec<i32> = parts.by_ref().map(|p| p.parse()).collect::<Result<_, _>>().map_err(|_| "usage: solo <fxr id...>")?;
+            if ids.is_empty() {
+                return Err("usage: solo <fxr id...>".into());
             }
-        },
+            session::solo(&ids).then_some(()).ok_or("an FXR isn't injected")?
+        }
         "hide" => {
             let fxr = id()?;
             let hide = match parts.next() {

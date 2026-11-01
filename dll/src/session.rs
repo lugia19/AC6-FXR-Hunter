@@ -58,8 +58,6 @@ struct Session {
     added: HashSet<usize>,
     /// Recorded FXRs removed from the list (until the next recording).
     dismissed: HashSet<usize>,
-    /// Keyboard selection (Up/Down; Insert/Delete/Home/Page Up act on it).
-    selected: Option<usize>,
     message: String,
 }
 
@@ -74,7 +72,6 @@ fn with<R>(f: impl FnOnce(&mut Session) -> R) -> R {
         hidden: HashSet::new(),
         added: HashSet::new(),
         dismissed: HashSet::new(),
-        selected: None,
         message: String::new(),
     });
     f(s)
@@ -141,7 +138,6 @@ pub fn record() {
         s.start = now;
         s.recording = true;
         s.dismissed.clear();
-        s.selected = None;
         s.message = "Recording: every FXR that shows up gets listed. F10 stops.".into();
         apply(s);
     });
@@ -158,35 +154,6 @@ pub fn stop() {
             log(&format!("recording stopped: {} FXRs: {ids:?}", ids.len()));
         }
     });
-}
-
-// ---- Selection (keyboard) ----
-
-pub fn step(delta: isize) {
-    with(|s| {
-        let l = list(s);
-        if l.is_empty() {
-            return;
-        }
-        let n = l.len() as isize;
-        let k = match s.selected.and_then(|i| l.iter().position(|&j| j == i)) {
-            Some(k) => (k as isize + delta).rem_euclid(n) as usize,
-            None => 0,
-        };
-        s.selected = Some(l[k]);
-        s.message = format!("Selected {}/{}: FXR {}", k + 1, n, id_of(l[k]));
-        log(&s.message);
-        apply(s);
-    });
-}
-
-pub fn select(fxr_id: i32) -> bool {
-    let Some(i) = crate::index_of(fxr_id) else { return false };
-    with(|s| {
-        s.selected = if s.selected == Some(i) { None } else { Some(i) };
-        apply(s);
-    });
-    true
 }
 
 // ---- Looks ----
@@ -225,24 +192,23 @@ pub fn set_hidden(fxr_id: i32, hide: Option<bool>) -> bool {
     true
 }
 
-/// Hides every recorded FXR except this one (and shows this one).
-pub fn solo(fxr_id: i32) -> bool {
-    let Some(i) = crate::index_of(fxr_id) else { return false };
+/// Hides every listed FXR except these (and shows these).
+pub fn solo(fxr_ids: &[i32]) -> bool {
+    let Some(keep) = fxr_ids.iter().map(|&id| crate::index_of(id)).collect::<Option<Vec<usize>>>() else { return false };
     with(|s| {
         for j in list(s) {
             s.hidden.insert(j);
         }
-        s.hidden.remove(&i);
-        s.message = format!("Solo: FXR {fxr_id}");
+        for i in &keep {
+            s.hidden.remove(i);
+        }
+        s.message = match fxr_ids {
+            [one] => format!("Solo: FXR {one}"),
+            _ => format!("Solo: {} FXRs", fxr_ids.len()),
+        };
         apply(s);
     });
     true
-}
-
-pub fn solo_selected() {
-    if let Some(i) = with(|s| s.selected) {
-        solo(id_of(i));
-    }
 }
 
 pub fn unhide_all() {
@@ -250,31 +216,6 @@ pub fn unhide_all() {
         s.hidden.clear();
         apply(s);
     });
-}
-
-/// Selected FXR: stock -> red -> green -> ... -> magenta -> stock.
-pub fn cycle_selected() {
-    with(|s| {
-        let Some(i) = s.selected else { return };
-        let next = match s.looks.get(&i).copied().unwrap_or(0) {
-            0 => 2,
-            7 => 0,
-            m => m + 1,
-        };
-        if next == 0 {
-            s.looks.remove(&i);
-        } else {
-            s.looks.insert(i, next);
-        }
-        apply(s);
-    });
-}
-
-/// Selected FXR: hidden <-> shown.
-pub fn hide_selected() {
-    if let Some(i) = with(|s| s.selected) {
-        set_hidden(id_of(i), None);
-    }
 }
 
 pub fn reset_looks() {
@@ -296,12 +237,6 @@ pub fn toggle_watch(fxr_id: i32) -> bool {
     w.store(armed, Ordering::Relaxed);
     log(&format!("watch {fxr_id}: {}", if armed { "armed" } else { "off" }));
     true
-}
-
-pub fn toggle_watch_selected() {
-    if let Some(i) = with(|s| s.selected) {
-        toggle_watch(id_of(i));
-    }
 }
 
 /// Called from the read hook when a watched FXR appears (it has already been disarmed).
@@ -337,7 +272,6 @@ pub fn state() -> Value {
                     "look": s.looks.get(&i).copied().unwrap_or(0),
                     "hidden": s.hidden.contains(&i),
                     "watch": t.watch[i].load(Ordering::Relaxed),
-                    "selected": s.selected == Some(i),
                 })
             })
             .collect();

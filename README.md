@@ -31,11 +31,11 @@ which is which. Any FXR can also slow down or freeze the game the next time it a
      value when they emit particles, so a new look shows on newly emitted particles.
    - **F11**: slow on/off any time. "Slow speed" in the UI sets how slow (F11 and slow on appear): e.g. 0.1 = 10%
      speed; 0 = frozen (0.0001 internally).
-   - Keys for the selected row: **Up/Down** select (marked ▶ in the UI), **Insert** cycle its
-     color, **Delete** hide/show, **Home** solo it, **Page Up** slow when it appears,
-     **Page Down** reset all looks. Only F-keys, arrows and the Insert block, since you keep playing.
+   - **Several at once**: tick rows (Shift+click: a range, Ctrl+A or the header box: all) and use the bar above the
+     list: color, Hide, Show, Solo (the ticked ones stay visible), Copy IDs, Ignore, ×.
+   - In game, only **F9** / **F10** / **F11**; everything else is in the UI.
 
-   Selections, recordings and freezes are logged to `Game\debug-logs\fxr_hunter.log`.
+   Recordings, seen-log starts and freezes are logged to `Game\debug-logs\fxr_hunter.log`.
 
 An effect is often several FXRs (parent + children, or several spawned together): each is its own entry.
 
